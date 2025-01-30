@@ -3,10 +3,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 class AttDiCEm(nn.Module):
-    def __init__(self, input_size, hidden_size, kernel_size=3, dilation_rates=[1, 2, 4]):
+    def __init__(self, input_size, hidden_size=64, kernel_size=3, dilation_rates=[1, 2, 4], num_heads=2):
         super(AttDiCEm, self).__init__()
 
-        # Fix: Add correct padding to maintain sequence length
+        # Causal Convolution Layers with dynamic dilation and kernel size
         self.conv_layers = nn.ModuleList([
             nn.Conv1d(in_channels=input_size, out_channels=hidden_size, 
                       kernel_size=kernel_size, padding=(kernel_size - 1) * d // 2, 
@@ -15,7 +15,7 @@ class AttDiCEm(nn.Module):
         ])
 
         # Attention layer
-        self.attention = nn.MultiheadAttention(embed_dim=hidden_size, num_heads=2, batch_first=True)
+        self.attention = nn.MultiheadAttention(embed_dim=hidden_size, num_heads=num_heads, batch_first=True)
 
         # Fully connected layer
         self.fc = nn.Linear(hidden_size, 1)
@@ -32,7 +32,7 @@ class AttDiCEm(nn.Module):
         # Apply dilated convolutions
         conv_outputs = [F.relu(conv(x)) for conv in self.conv_layers]
 
-        # Fix: Ensure that all outputs have the same sequence length
+        # Ensure all outputs have the same sequence length
         min_seq_len = min([out.shape[2] for out in conv_outputs])
         conv_outputs = [out[:, :, :min_seq_len] for out in conv_outputs]
 
