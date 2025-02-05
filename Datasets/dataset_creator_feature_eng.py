@@ -1,13 +1,11 @@
-# Define a custom Dataset that uses only engineered features as input,
-# and uses the raw (normalized) Close price as the target.
 
-# Simple Dataset
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
 import pandas as pd
 from sklearn.model_selection import train_test_split
 
+# Predict the second day after the sequence
 
 class StockDataset(Dataset):
     def __init__(self, data, seq_len, feature_columns, target_column='Close'):

@@ -2,22 +2,11 @@ import numpy as np
 import pandas as pd
 
 def compute_stock_relation_matrix(stock_data, relation_types=['return_correlation'], return_threshold=0.5, MA5_threshold=0.5):
-    """
-    Compute a relation matrix among stocks based on one or more specified relation types.
-    
-    For each relation type, the function computes a binary relation between stocks
-    (1 if related, 0 otherwise) based on a threshold.
-    
-    Args:
-        stock_data: dict, mapping ticker -> DataFrame.
-        relation_types: list of strings, each specifying a type of relation.
-                        For example, ['return_correlation', 'MA5_correlation'].
-        threshold: float, the absolute correlation threshold for a relation.
-        
+    """  
     Returns:
         tickers: list of tickers in order.
         relation_matrix: numpy array of shape (N, N, G) where N is the number of stocks and
-                         G is the number of relation types.
+        G is the number of relation types.
     """
     tickers = list(stock_data.keys())
     N = len(tickers)

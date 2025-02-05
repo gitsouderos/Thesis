@@ -3,19 +3,7 @@ import pandas as pd
 import numpy as np
 
 def compute_financial_indicators(df):
-    """
-    Given a DataFrame with daily stock data, compute additional financial indicators.
-    
-    Expected columns in df: Date, Open, High, Low, Close, Volume.
-    
-    Returns:
-        A DataFrame with additional columns:
-          - Return: (Close - Open) / Open
-          - Diff: Close - Open
-          - HL_Diff: High - Low
-          - MA5: 5-day moving average of Close (shifted to avoid leakage)
-          - Return_MA5: 5-day moving average of Return (shifted)
-    """
+   
     df = df.copy()
     # Make sure the data is sorted by Date
     df['Date'] = pd.to_datetime(df['Date'])
@@ -42,17 +30,12 @@ def compute_financial_indicators(df):
 
 def load_all_stock_data(data_folder):
     """
-    Load CSV files for all stocks from the specified folder.
-    
-    Assumes each CSV filename is like "AAPL.csv", "MSFT.csv", etc.
-    
-    Returns:
-        A dictionary mapping ticker symbols to their processed DataFrames.
+    A dictionary mapping ticker symbols to their processed DataFrames.
     """
     stock_data = {}
     for file in os.listdir(data_folder):
         if file.endswith('.csv'):
-            ticker = file.split('.')[0]  # e.g., "AAPL" from "AAPL.csv"
+            ticker = file.split('.')[0]  
             file_path = os.path.join(data_folder, file)
             df = pd.read_csv(file_path)
             df = compute_financial_indicators(df)
