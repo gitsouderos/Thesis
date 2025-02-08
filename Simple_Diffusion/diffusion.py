@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import torch.nn as nn
 
 def forward_diffusion_sample(x_0, timestep, betas):
     """
@@ -65,11 +66,41 @@ def get_time_embedding(t,embedding_dim):
 
     return time_embedding
 
-    
+
+class model_architecture(nn.Module):
+    """
+    Returns the output of the model architecture given the input tensor x_combined.
+
+    Args:
+    - x_combined: Input tensor of shape [batch_size, dim + embedding_dim]
+
+    Returns:
+    - output: Output tensor of the model architecture
+    """
+
+    def __init__(self, dim, embedding_dim, hidden_size =256):
+        super(model_architecture, self).__init__()
+        self.fc1 = nn.Linear(dim + embedding_dim, hidden_size)
+        self.fc2 = nn.Linear(hidden_size, hidden_size)
+        self.fc3 = nn.Linear(hidden_size, dim)
+        self.relu = nn.ReLU()
+
+    def forward(self, x_combined):
+        # x_combined has shape [batch_size, dim + embedding_dim]
+        hidden1 = self.relu(self.fc1(x_combined))
+        hidden2 = self.relu(self.fc2(hidden1))
+        predicted_noise = self.fc3(hidden2)
+        return predicted_noise
+
 
 def reverse_diffusion_sample(x_T, timestep):
     
     """
     
     """
+    # Get time embeddings
+    time_embedding = get_time_embedding(timestep, 2)
+
+    # Concatenate x_T and time_embedding
+    x = torch.cat([x_T, time_embedding], dim=-1) # Shape: [batch_size, dim + embedding_dim]
 
