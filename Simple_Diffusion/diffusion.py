@@ -93,14 +93,55 @@ class model_architecture(nn.Module):
         return predicted_noise
 
 
-def reverse_diffusion_sample(x_T, timestep):
+def reverse_diffusion_sample(x_T, betas, timestep):
     
     """
+    Performs one reverse diffusion step.
     
+    Args:
+      - x_T: Noisy sample at current timestep (tensor of shape [batch_size, dim])
+      - timestep: A tensor of shape [batch_size] containing the current diffusion timesteps (as integers)
+      - betas: 1D tensor of shape [T] containing the beta schedule for each timestep.
+      - denoise_net: An instance of your denoising network (e.g., model_architecture)
+    
+    Returns:
+      - x_t_minus_1: Updated (less noisy) sample, tensor of shape [batch_size, dim]
     """
+    
+    # Get dimensions of the input tensor
+    _, dim = x_T.shape
+
     # Get time embeddings
     time_embedding = get_time_embedding(timestep, 2)
+
+    # get embedding dimension
+    _,embedding_dim = time_embedding.shape
 
     # Concatenate x_T and time_embedding
     x = torch.cat([x_T, time_embedding], dim=-1) # Shape: [batch_size, dim + embedding_dim]
 
+    # pass x through the model architecture
+    predicted_noise = model_architecture(dim, embedding_dim)(x) # Shape: [batch_size, dim]
+    
+    # Retrieve beta_t for each sample from the beta schedule.
+    beta_t = betas[timestep].unsqueeze(1)  # Shape: [batch_size, 1]
+
+    # Compute alpha_t = 1 - beta_t
+    alpha_t = 1 - beta_t  # Shape: [batch_size, 1]
+
+    # Compute the cumulative product of alphas over the entire schedule
+    alphas = 1 - betas  # Shape: [T]
+    alpha_bars = torch.cumprod(alphas, dim=0)  # Shape: [T]
+
+    # Retrieve alpha_bar_t for the current timestep and unsqueeze for broadcasting.
+    alpha_bar_t = alpha_bars[timestep].unsqueeze(1)  # Shape: [batch_size, 1]
+
+    # Compute the necessary square roots
+    sqrt_alpha_t = torch.sqrt(alpha_t)                   # Shape: [batch_size, 1]
+    sqrt_one_minus_alpha_bar_t = torch.sqrt(1 - alpha_bar_t)  # Shape: [batch_size, 1]
+
+    # Apply the reverse diffusion update:
+    # x_{t-1} = ( x_T - (beta_t / sqrt(1 - alpha_bar_t)) * predicted_noise ) / sqrt(alpha_t)
+    x_t_minus_1 = (x_T - (beta_t / sqrt_one_minus_alpha_bar_t) * predicted_noise) / sqrt_alpha_t
+
+    return x_t_minus_1
