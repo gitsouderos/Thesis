@@ -93,7 +93,7 @@ class model_architecture(nn.Module):
         return predicted_noise
 
 
-def reverse_diffusion_sample(x_T, betas, timestep):
+def reverse_diffusion_sample(x_T, betas, timestep, denoise_net):
     
     """
     Performs one reverse diffusion step.
@@ -107,7 +107,7 @@ def reverse_diffusion_sample(x_T, betas, timestep):
     Returns:
       - x_t_minus_1: Updated (less noisy) sample, tensor of shape [batch_size, dim]
     """
-    
+
     # Get dimensions of the input tensor
     _, dim = x_T.shape
 
@@ -121,7 +121,7 @@ def reverse_diffusion_sample(x_T, betas, timestep):
     x = torch.cat([x_T, time_embedding], dim=-1) # Shape: [batch_size, dim + embedding_dim]
 
     # pass x through the model architecture
-    predicted_noise = model_architecture(dim, embedding_dim)(x) # Shape: [batch_size, dim]
+    predicted_noise = denoise_net(dim, embedding_dim)(x) # Shape: [batch_size, dim]
     
     # Retrieve beta_t for each sample from the beta schedule.
     beta_t = betas[timestep].unsqueeze(1)  # Shape: [batch_size, 1]
