@@ -16,13 +16,13 @@ def forward_diffusion_sample(x_0, timestep, betas):
     """
 
     # Compute alpha values from beta
-    alphas = 1 - betas
+    alphas = 1 - betas # Shape: [T]
 
     # Compute cumulative product of alphas
-    alpha_bars = torch.cumprod(alphas,dim=0)
+    alpha_bars = torch.cumprod(alphas,dim=0) # Shape: [T]
     
     # Select appropriate alpha bar for the timestep
-    alpha_bar_t = alpha_bars[timestep]
+    alpha_bar_t = alpha_bars[timestep].unsqueeze(1) # shape: [batch_size, 1]
 
     # Generate Gaussian noise
     noise = torch.randn_like(x_0)
