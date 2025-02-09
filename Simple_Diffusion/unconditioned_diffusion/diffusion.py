@@ -176,8 +176,8 @@ def reverse_diffusion_sample(x_T, betas, timestep, embedding_dim, denoise_net):
 
     # pass x through the model architecture
     predicted_noise = denoise_net(x) # Shape: [batch_size, dim]
-    # print(f"noisy sample : {x_T}")
-    # print(f"predicted noise : {predicted_noise}")
+    print(f"noisy sample : {x_T}")
+    print(f"predicted noise : {predicted_noise}")
     
     # Retrieve beta_t for each sample from the beta schedule.
     beta_t = betas[timestep].unsqueeze(1)  # Shape: [batch_size, 1]
@@ -194,14 +194,14 @@ def reverse_diffusion_sample(x_T, betas, timestep, embedding_dim, denoise_net):
 
     # Compute the necessary square roots
     sqrt_alpha_t = torch.sqrt(alpha_t)                   # Shape: [batch_size, 1]
-    # print(f"square root of alpha_t : {sqrt_alpha_t}")
+    print(f"square root of alpha_t : {sqrt_alpha_t}")
     sqrt_one_minus_alpha_bar_t = torch.sqrt(1 - alpha_bar_t)  # Shape: [batch_size, 1]
-    # print(f"square root of 1 - alpha_bar_t : {sqrt_one_minus_alpha_bar_t}")
+    print(f"square root of 1 - alpha_bar_t : {sqrt_one_minus_alpha_bar_t}")
 
     # Apply the reverse diffusion update:
     # x_{t-1} = ( x_T - (beta_t / sqrt(1 - alpha_bar_t)) * predicted_noise ) / sqrt(alpha_t)
     x_t_minus_1 = (x_T - (beta_t / sqrt_one_minus_alpha_bar_t) * predicted_noise) / sqrt_alpha_t
-    # print(f"less noisy sample : {x_t_minus_1}")
+    print(f"less noisy sample : {x_t_minus_1}")
 
     return x_t_minus_1
 
