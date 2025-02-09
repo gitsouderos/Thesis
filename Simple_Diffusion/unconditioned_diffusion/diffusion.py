@@ -33,6 +33,34 @@ def forward_diffusion_sample(x_0, timestep, betas):
 
     return x_t, noise
 
+
+def cosine_beta_schedule(timesteps, s=0.008):
+    """
+    Generates a beta schedule based on a cosine function.
+    
+    Args:
+      - timesteps: Total number of diffusion steps (T).
+      - s: A small constant to adjust the schedule (commonly 0.008).
+    
+    Returns:
+      - betas: A torch tensor of shape [T] with the beta values.
+    """
+    # Create an array from 0 to T (inclusive)
+    x = np.linspace(0, timesteps, timesteps + 1)
+    
+    # Compute cumulative product (alpha_bar) using the cosine function
+    alphas_cumprod = np.cos(((x / timesteps + s) / (1 + s)) * (np.pi / 2)) ** 2
+    alphas_cumprod = alphas_cumprod / alphas_cumprod[0]  # Normalize so that alpha_bar_0 = 1
+    
+    # Compute betas from the cumulative product of alphas
+    betas = 1 - (alphas_cumprod[1:] / alphas_cumprod[:-1])
+    
+    # Clip betas to prevent extreme values (0, 1)
+    betas = np.clip(betas, 0, 0.999)
+    
+    return torch.tensor(betas, dtype=torch.float32)
+
+
 def get_time_embedding(t,embedding_dim):
     """
     Returns a time embedding for the given timestep.
@@ -92,6 +120,28 @@ class model_architecture(nn.Module):
         predicted_noise = self.fc3(hidden2)
         return predicted_noise
 
+class ResidualMLP(nn.Module):
+    def __init__(self, dim, embedding_dim, hidden_size=256):
+        super(ResidualMLP, self).__init__()
+        self.fc1 = nn.Linear(dim + embedding_dim, hidden_size)
+        self.fc2 = nn.Linear(hidden_size, hidden_size)
+        self.fc3 = nn.Linear(hidden_size, dim)
+        self.relu = nn.ReLU()
+    
+    def forward(self, x_combined):
+        # Pass through first layer
+        hidden1 = self.relu(self.fc1(x_combined))  # shape: [batch_size, hidden_size]
+        
+        # Pass through second layer
+        hidden2 = self.relu(self.fc2(hidden1))      # shape: [batch_size, hidden_size]
+        
+        # Add a residual connection: add hidden1 to hidden2
+        combined = hidden2 + hidden1                # shape: [batch_size, hidden_size]
+        
+        # Final layer: map to output dimension (dim)
+        predicted_noise = self.fc3(combined)        # shape: [batch_size, dim]
+        return predicted_noise
+
 
 def reverse_diffusion_sample(x_T, betas, timestep, embedding_dim, denoise_net):
     
@@ -126,6 +176,8 @@ def reverse_diffusion_sample(x_T, betas, timestep, embedding_dim, denoise_net):
 
     # pass x through the model architecture
     predicted_noise = denoise_net(x) # Shape: [batch_size, dim]
+    print(f"noisy sample : {x_T}")
+    print(f"predicted noise : {predicted_noise}")
     
     # Retrieve beta_t for each sample from the beta schedule.
     beta_t = betas[timestep].unsqueeze(1)  # Shape: [batch_size, 1]
@@ -142,15 +194,18 @@ def reverse_diffusion_sample(x_T, betas, timestep, embedding_dim, denoise_net):
 
     # Compute the necessary square roots
     sqrt_alpha_t = torch.sqrt(alpha_t)                   # Shape: [batch_size, 1]
+    print(f"square root of alpha_t : {sqrt_alpha_t}")
     sqrt_one_minus_alpha_bar_t = torch.sqrt(1 - alpha_bar_t)  # Shape: [batch_size, 1]
+    print(f"square root of 1 - alpha_bar_t : {sqrt_one_minus_alpha_bar_t}")
 
     # Apply the reverse diffusion update:
     # x_{t-1} = ( x_T - (beta_t / sqrt(1 - alpha_bar_t)) * predicted_noise ) / sqrt(alpha_t)
     x_t_minus_1 = (x_T - (beta_t / sqrt_one_minus_alpha_bar_t) * predicted_noise) / sqrt_alpha_t
+    print(f"less noisy sample : {x_t_minus_1}")
 
     return x_t_minus_1
 
-def run_reverse_diffusion(denoise_net, betas, num_steps, batch_size, dim):
+def run_reverse_diffusion(denoise_net, betas, num_steps, batch_size, dim, embedding_dim):
     """
     Runs the full reverse diffusion chain to generate samples.
     
@@ -169,9 +224,10 @@ def run_reverse_diffusion(denoise_net, betas, num_steps, batch_size, dim):
     
     # Loop from t = num_steps - 1 down to 0
     for t_val in reversed(range(num_steps)):
+        print(f"timestep: {t_val}")
         # Create a timestep tensor for the current step, shape: [batch_size]
         t_tensor = torch.full((batch_size,), t_val, dtype=torch.long)
         # Update x_t by performing one reverse diffusion step
-        x_t = reverse_diffusion_sample(x_t, betas, t_tensor, denoise_net)
+        x_t = reverse_diffusion_sample(x_t, betas, t_tensor,embedding_dim, denoise_net)
     return x_t
 
