@@ -149,3 +149,29 @@ def reverse_diffusion_sample(x_T, betas, timestep, embedding_dim, denoise_net):
     x_t_minus_1 = (x_T - (beta_t / sqrt_one_minus_alpha_bar_t) * predicted_noise) / sqrt_alpha_t
 
     return x_t_minus_1
+
+def run_reverse_diffusion(denoise_net, betas, num_steps, batch_size, dim):
+    """
+    Runs the full reverse diffusion chain to generate samples.
+    
+    Args:
+      - denoise_net: The trained denoising network.
+      - betas: 1D tensor of beta values (shape: [num_steps]).
+      - num_steps: Total number of diffusion steps.
+      - batch_size: Number of samples to generate.
+      - dim: Dimensionality of each sample (for your case, 1).
+      
+    Returns:
+      - x_0_pred: The generated sample(s) after running reverse diffusion.
+    """
+    # Initialize x_T as pure Gaussian noise
+    x_t = torch.randn(batch_size, dim)
+    
+    # Loop from t = num_steps - 1 down to 0
+    for t_val in reversed(range(num_steps)):
+        # Create a timestep tensor for the current step, shape: [batch_size]
+        t_tensor = torch.full((batch_size,), t_val, dtype=torch.long)
+        # Update x_t by performing one reverse diffusion step
+        x_t = reverse_diffusion_sample(x_t, betas, t_tensor, denoise_net)
+    return x_t
+
