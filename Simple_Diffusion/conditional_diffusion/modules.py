@@ -138,7 +138,7 @@ class model_architecture(nn.Module):
         self.relu = nn.ReLU()
 
     def forward(self, x_combined):
-        # x_combined has shape [batch_size, dim + embedding_dim]
+        # x_combined has shape [batch_size, dim + embedding_dim+ context_embedding_size]
         hidden1 = self.relu(self.fc1(x_combined))
         hidden2 = self.relu(self.fc2(hidden1))
         predicted_noise = self.fc3(hidden2)
@@ -169,7 +169,7 @@ class ResidualMLP(nn.Module):
         return predicted_noise
 
 
-def reverse_diffusion_sample(x_T, betas, timestep, embedding_dim, denoise_net):
+def reverse_diffusion_sample(x_T, betas, timestep, embedding_dim, context, context_net, denoise_net):
     
     """
     Performs one reverse diffusion step.
@@ -200,8 +200,14 @@ def reverse_diffusion_sample(x_T, betas, timestep, embedding_dim, denoise_net):
     x = torch.cat([x_T, time_embedding], dim=-1) # Shape: [batch_size, dim + embedding_dim]
     # print(f"x shape: {x.shape}")
 
+    # Get context embedding
+    context_embedding = context_net(context) # Shape: [batch_size, context_embedding_size]
+
+    # Concatentate x and context_embedding
+    x_combined = torch.cat([x, context_embedding], dim=-1) # Shape: [batch_size, dim + embedding_dim + context_embedding_size]
+
     # pass x through the model architecture
-    predicted_noise = denoise_net(x) # Shape: [batch_size, dim]
+    predicted_noise = denoise_net(x_combined) # Shape: [batch_size, dim]
     # print(f"noisy sample : {x_T}")
     # print(f"predicted noise : {predicted_noise}")
     
