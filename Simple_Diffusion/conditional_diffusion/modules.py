@@ -128,9 +128,11 @@ class model_architecture(nn.Module):
     - output: Output tensor of the model architecture
     """
 
-    def __init__(self, dim, embedding_dim, hidden_size =256):
+    def __init__(self, dim, embedding_dim, context_embedding_size, hidden_size =256):
         super(model_architecture, self).__init__()
-        self.fc1 = nn.Linear(dim + embedding_dim, hidden_size)
+        #Total input dimension is dim + embedding_dim + context_embedding_size
+        total_input_dim = dim + embedding_dim + context_embedding_size
+        self.fc1 = nn.Linear(total_input_dim, hidden_size)
         self.fc2 = nn.Linear(hidden_size, hidden_size)
         self.fc3 = nn.Linear(hidden_size, dim)
         self.relu = nn.ReLU()
@@ -143,9 +145,11 @@ class model_architecture(nn.Module):
         return predicted_noise
 
 class ResidualMLP(nn.Module):
-    def __init__(self, dim, embedding_dim, hidden_size=256):
+    def __init__(self, dim, embedding_dim,context_embedding_size, hidden_size=256):
         super(ResidualMLP, self).__init__()
-        self.fc1 = nn.Linear(dim + embedding_dim, hidden_size)
+        #Total input dimension is dim + embedding_dim + context_embedding_size
+        total_input_dim = dim + embedding_dim + context_embedding_size
+        self.fc1 = nn.Linear(total_input_dim, hidden_size)
         self.fc2 = nn.Linear(hidden_size, hidden_size)
         self.fc3 = nn.Linear(hidden_size, dim)
         self.relu = nn.ReLU()
