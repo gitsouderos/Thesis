@@ -16,6 +16,9 @@ def forward_diffusion_sample(x_0, timestep, betas):
     - noise: Noise added to the sample
     """
 
+    # Unsqueeze x0
+    x_0 = x_0.unsqueeze(1) # Shape: [batch_size, 1]
+
     # Compute alpha values from beta
     alphas = 1 - betas # Shape: [T]
 
@@ -113,6 +116,7 @@ class Context_Encoder(nn.Module):
         # context has shape [batch_size, context_len, num_features]
         # pass context through the LSTM
         _, (h_n,_) = self.lstm(context)
+        # print(f"h_n shape: {h_n.shape}")
         # h_n has shape [1, batch_size, context_embedding_size]
         context_embedding = h_n.squeeze(0) # shape: [batch_size, context_embedding_size]
         return context_embedding
@@ -237,7 +241,7 @@ def reverse_diffusion_sample(x_T, betas, timestep, embedding_dim, context, conte
 
     return x_t_minus_1
 
-def run_reverse_diffusion(denoise_net, betas, num_steps, batch_size, dim, embedding_dim):
+def run_reverse_diffusion(denoise_net, context_net, context, betas, num_steps, batch_size, dim, embedding_dim):
     """
     Runs the full reverse diffusion chain to generate samples.
     
@@ -253,13 +257,12 @@ def run_reverse_diffusion(denoise_net, betas, num_steps, batch_size, dim, embedd
     """
     # Initialize x_T as pure Gaussian noise
     x_t = torch.randn(batch_size, dim)
-    
     # Loop from t = num_steps - 1 down to 0
     for t_val in reversed(range(num_steps)):
         print(f"timestep: {t_val}")
         # Create a timestep tensor for the current step, shape: [batch_size]
         t_tensor = torch.full((batch_size,), t_val, dtype=torch.long)
         # Update x_t by performing one reverse diffusion step
-        x_t = reverse_diffusion_sample(x_t, betas, t_tensor,embedding_dim, denoise_net)
+        x_t = reverse_diffusion_sample(x_t, betas, t_tensor,embedding_dim, context, context_net, denoise_net,context_net,context)
     return x_t
 
