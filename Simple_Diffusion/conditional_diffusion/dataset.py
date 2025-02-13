@@ -7,7 +7,7 @@ class ConditionalStockDataset(Dataset):
 
         # Convert relevant columns to torch tensors
         self.features = torch.tensor(data[feature_columns].values, dtype=torch.float32)
-        self.targets = torch.tensor(data[target_column].valeus, dtype = torch.float32)
+        self.targets = torch.tensor(data[target_column].values, dtype = torch.float32)
         self.context_len = context_len
 
     def __len__(self):
