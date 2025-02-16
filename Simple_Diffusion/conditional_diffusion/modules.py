@@ -147,6 +147,135 @@ class model_architecture(nn.Module):
         hidden2 = self.relu(self.fc2(hidden1))
         predicted_noise = self.fc3(hidden2)
         return predicted_noise
+    
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+# Define the Att-DCNN module for context encoding.
+class Context_Encoder(nn.Module):
+    def __init__(self, input_dim, hidden_dim, kernel_size=3, dilation_rates=[1, 2, 4], num_heads=4):
+        """
+        Args:
+          - input_dim: Number of features in the context (e.g., 9).
+          - hidden_dim: The output dimension for the convolution layers and the attention block.
+          - kernel_size: Size of the convolution kernels.
+          - dilation_rates: List of dilation rates.
+          - num_heads: Number of attention heads.
+        """
+        super(Context_Encoder, self).__init__()
+        # Create a set of dilated convolution layers
+        self.convs = nn.ModuleList([
+            nn.Conv1d(in_channels=input_dim, out_channels=hidden_dim,
+                      kernel_size=kernel_size, dilation=d, padding=(kernel_size - 1) * d // 2)
+            for d in dilation_rates
+        ])
+        # Multi-head self-attention over the sequence
+        self.attention = nn.MultiheadAttention(embed_dim=hidden_dim, num_heads=num_heads, batch_first=True)
+        # Fully connected layer to refine the aggregated context embedding
+        self.fc = nn.Linear(hidden_dim, hidden_dim)
+        self.relu = nn.ReLU()
+
+    def forward(self, x):
+        """
+        Args:
+          - x: Tensor of shape [batch_size, sequence_length, input_dim]
+        Returns:
+          - context_embedding: Tensor of shape [batch_size, hidden_dim]
+        """
+        # Permute for convolution: [batch_size, input_dim, sequence_length]
+        x_conv = x.permute(0, 2, 1)
+        conv_outs = []
+        for conv in self.convs:
+            conv_out = F.relu(conv(x_conv))  # shape: [batch_size, hidden_dim, sequence_length]
+            conv_outs.append(conv_out)
+        # Average the outputs from different dilation rates
+        x_conv = torch.stack(conv_outs, dim=0).mean(dim=0)  # shape: [batch_size, hidden_dim, sequence_length]
+        # Permute back for attention: [batch_size, sequence_length, hidden_dim]
+        x_conv = x_conv.permute(0, 2, 1)
+        # Apply multi-head self-attention; query, key, and value are all x_conv
+        attn_output, _ = self.attention(x_conv, x_conv, x_conv)  # shape: [batch_size, sequence_length, hidden_dim]
+        # Aggregate over the sequence dimension (mean pooling)
+        context_embedding = attn_output.mean(dim=1)  # shape: [batch_size, hidden_dim]
+        # Refine with a fully connected layer and non-linearity
+        context_embedding = self.relu(self.fc(context_embedding))
+        return context_embedding
+    
+# class PermutedLayerNorm(nn.Module):
+#     def __init__(self, normalized_shape):
+#         """
+#         normalized_shape: the expected size of the last dimension (e.g., hidden_dim)
+#         """
+#         super(PermutedLayerNorm, self).__init__()
+#         self.ln = nn.LayerNorm(normalized_shape)
+    
+#     def forward(self, x):
+#         # x is expected to be of shape [batch_size, hidden_dim, seq_len]
+#         x = x.transpose(1, 2)   # Now shape: [batch_size, seq_len, hidden_dim]
+#         x = self.ln(x)          # Normalize over last dimension (hidden_dim)
+#         return x.transpose(1, 2)  # Back to [batch_size, hidden_dim, seq_len]
+
+# class Context_Encoder(nn.Module):
+#     def __init__(self, input_dim, hidden_dim, kernel_sizes=[3, 5], dilation_rates=[1, 2, 4], num_heads=4):
+#         """
+#         A more sophisticated attention-based dilated CNN for encoding temporal patterns.
+        
+#         Args:
+#           - input_dim: Number of features in the context (e.g., 9).
+#           - hidden_dim: The output dimension for the convolution layers and the attention block.
+#           - kernel_sizes: List of kernel sizes for parallel convolutions.
+#           - dilation_rates: List of dilation rates.
+#           - num_heads: Number of attention heads for the self-attention block.
+#         """
+#         super(Context_Encoder, self).__init__()
+        
+#         # Create multiple parallel convolution blocks with different kernel sizes and dilation rates.
+#         self.conv_blocks = nn.ModuleList()
+#         for k in kernel_sizes:
+#             for d in dilation_rates:
+#                 padding = (k - 1) * d // 2
+#                 conv_block = nn.Sequential(
+#                     nn.Conv1d(in_channels=input_dim, out_channels=hidden_dim, kernel_size=k, dilation=d, padding=padding),
+#                     PermutedLayerNorm(hidden_dim),  # Apply LayerNorm over hidden_dim dimension
+#                     nn.ReLU()
+#                 )
+#                 self.conv_blocks.append(conv_block)
+        
+#         # Multi-head self-attention block.
+#         self.attention = nn.MultiheadAttention(embed_dim=hidden_dim, num_heads=num_heads, batch_first=True)
+        
+#         # A feed-forward layer to refine the aggregated context embedding.
+#         self.fc = nn.Linear(hidden_dim, hidden_dim)
+#         self.relu = nn.ReLU()
+
+#     def forward(self, x):
+#         """
+#         Args:
+#           - x: Input tensor of shape [batch_size, sequence_length, input_dim]
+#         Returns:
+#           - context_embedding: Tensor of shape [batch_size, hidden_dim]
+#         """
+#         batch_size, seq_len, _ = x.size()
+#         # Permute for convolution: [batch_size, input_dim, sequence_length]
+#         x_permuted = x.permute(0, 2, 1)
+#         conv_outs = []
+#         for conv in self.conv_blocks:
+#             conv_out = conv(x_permuted)  # shape: [batch_size, hidden_dim, sequence_length]
+#             conv_outs.append(conv_out)
+#         # Average the outputs from the different convolution blocks.
+#         x_conv = torch.stack(conv_outs, dim=0).mean(dim=0)  # shape: [batch_size, hidden_dim, sequence_length]
+#         # Permute back for self-attention: [batch_size, sequence_length, hidden_dim]
+#         x_conv = x_conv.permute(0, 2, 1)
+        
+#         # Apply multi-head self-attention; query, key, and value are all x_conv.
+#         attn_output, _ = self.attention(x_conv, x_conv, x_conv)  # shape: [batch_size, sequence_length, hidden_dim]
+        
+#         # Aggregate over the sequence dimension (e.g., mean pooling).
+#         context_embedding = attn_output.mean(dim=1)  # shape: [batch_size, hidden_dim]
+        
+#         # Refine the aggregated embedding with a fully connected layer and ReLU.
+#         context_embedding = self.relu(self.fc(context_embedding))
+#         return context_embedding
 
 class ResidualMLP(nn.Module):
     def __init__(self, dim, embedding_dim,context_embedding_size, hidden_size=256):
@@ -170,6 +299,72 @@ class ResidualMLP(nn.Module):
         
         # Final layer: map to output dimension (dim)
         predicted_noise = self.fc3(combined)        # shape: [batch_size, dim]
+        return predicted_noise
+
+class ResidualMLP(nn.Module):
+    def __init__(self, dim, embedding_dim, context_embedding_size, hidden_size=512, num_chunks=8, attn_heads=4):
+        """
+        A Residual MLP that includes an attention mechanism over feature chunks.
+        
+        Args:
+          - dim: Dimension of the noisy sample (e.g., 1 for a scalar target).
+          - embedding_dim: Dimension of the time embedding.
+          - context_embedding_size: Dimension of the context embedding.
+          - hidden_size: Hidden layer size for the MLP.
+          - num_chunks: Number of chunks to split the hidden vector into for attention.
+          - attn_heads: Number of attention heads.
+          
+        The total input dimension is: dim + embedding_dim + context_embedding_size.
+        """
+        super(ResidualMLP, self).__init__()
+        total_input_dim = dim + embedding_dim + context_embedding_size
+        self.fc1 = nn.Linear(total_input_dim, hidden_size)
+        self.relu = nn.ReLU()
+        
+        # Parameters for splitting the hidden vector into chunks
+        self.num_chunks = num_chunks
+        assert hidden_size % num_chunks == 0, "hidden_size must be divisible by num_chunks"
+        self.chunk_size = hidden_size // num_chunks
+        
+        # Multi-head attention that will operate on a sequence of length num_chunks and embed_dim = chunk_size.
+        self.attention = nn.MultiheadAttention(embed_dim=self.chunk_size, num_heads=attn_heads, batch_first=True)
+        
+        # A second fully connected layer after attention, with a residual connection.
+        self.fc2 = nn.Linear(hidden_size, hidden_size)
+        self.fc3 = nn.Linear(hidden_size, dim)
+    
+    def forward(self, x_combined):
+        """
+        Args:
+          - x_combined: Input tensor of shape [batch_size, total_input_dim] 
+                        where total_input_dim = dim + embedding_dim + context_embedding_size.
+        Returns:
+          - predicted_noise: Tensor of shape [batch_size, dim]
+        """
+        # Pass through the first FC layer and activation.
+        hidden1 = self.relu(self.fc1(x_combined))  # shape: [batch_size, hidden_size]
+        
+        # Split the hidden vector into chunks.
+        batch_size = hidden1.shape[0]
+        # Reshape to [batch_size, num_chunks, chunk_size]
+        hidden_chunks = hidden1.view(batch_size, self.num_chunks, self.chunk_size)
+        
+        # Apply multi-head self-attention on these chunks.
+        # Since we are doing self-attention on a sequence, we use hidden_chunks as query, key, and value.
+        attn_output, _ = self.attention(hidden_chunks, hidden_chunks, hidden_chunks)
+        # attn_output has shape: [batch_size, num_chunks, chunk_size]
+        
+        # Flatten the attended output back to [batch_size, hidden_size]
+        attn_flat = attn_output.reshape(batch_size, -1)
+        
+        # Optionally, add a residual connection (here, we add the original hidden1 to the attended output).
+        combined = attn_flat + hidden1  # shape: [batch_size, hidden_size]
+        
+        # Pass through the second FC layer and activation.
+        hidden2 = self.relu(self.fc2(combined))  # shape: [batch_size, hidden_size]
+        
+        # Final layer to predict the noise.
+        predicted_noise = self.fc3(hidden2)  # shape: [batch_size, dim]
         return predicted_noise
 
 
