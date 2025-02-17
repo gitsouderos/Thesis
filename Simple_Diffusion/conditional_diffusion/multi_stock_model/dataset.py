@@ -40,6 +40,6 @@ def load_all_stock_data(data_folder):
             df = pd.read_csv(file_path)
             df = compute_financial_indicators(df)
             stock_data[ticker] = df
-            print(f"Loaded and processed data for {ticker}: {len(df)} records.")
+    print(f"Loaded and processed data for {len(stock_data)} stocks")
     return stock_data
 
