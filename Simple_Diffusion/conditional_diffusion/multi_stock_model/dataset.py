@@ -1,6 +1,8 @@
 import os
 import pandas as pd
 import numpy as np
+import torch
+from torch.utils.data import Dataset
 
 def compute_financial_indicators(df):
    
@@ -42,4 +44,26 @@ def load_all_stock_data(data_folder):
             stock_data[ticker] = df
     print(f"Loaded and processed data for {len(stock_data)} stocks")
     return stock_data
+
+
+
+
+class ConditionalStockDataset(Dataset):
+    def __init__(self, data, context_len, feature_columns, target_column='Close'):
+
+        # Convert relevant columns to torch tensors
+        for ticker in data:
+
+            self.features = torch.tensor(data[ticker][feature_columns].values, dtype=torch.float32)
+            self.targets = torch.tensor(data[ticker][target_column].values, dtype = torch.float32)
+            self.context_len = context_len
+
+    def __len__(self):
+        return len(self.features)- self.context_len
+    
+    def __getitem__(self, idx):
+        context = self.features[idx:idx+self.context_len]
+        x0 = self.targets[idx+self.context_len]
+
+        return context, x0
 
