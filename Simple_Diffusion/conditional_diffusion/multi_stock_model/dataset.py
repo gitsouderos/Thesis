@@ -51,19 +51,36 @@ def load_all_stock_data(data_folder):
 class ConditionalStockDataset(Dataset):
     def __init__(self, data, context_len, feature_columns, target_column='Close'):
 
+        self.samples = []
+
         # Convert relevant columns to torch tensors
         for ticker in data:
 
-            self.features = torch.tensor(data[ticker][feature_columns].values, dtype=torch.float32)
-            self.targets = torch.tensor(data[ticker][target_column].values, dtype = torch.float32)
-            self.context_len = context_len
+            # Retrive dataframe
+            df = data[ticker]
+
+            # Sort values on date, ascending
+            df.sort_values(by=['Date'])
+
+            for i in range(0,len(df)-context_len): # Eg: (0, 10-2) : i = 0,1,..,7
+                # For each dataframe extract the context window based on the feature columns
+                context = df[feature_columns][i:i+context_len-1] # Eg i = 2, we take from i = 2 until 2+2-1 = 3
+
+                # Get x0
+                x0 = df[target_column].iloc[i+context_len] # We get item at position 2+2 = 4
+            
+                # Save a tuple containing ticker, the context and the x0
+                context_tensor = torch.tensor(context.values,dtype=torch.float32)
+                x0_tensor = torch.tensor(x0.values, dtype=torch.float32)
+                grouped = (ticker,context_tensor,x0_tensor)
+                self.samples.append(grouped)
 
     def __len__(self):
-        return len(self.features)- self.context_len
-    
-    def __getitem__(self, idx):
-        context = self.features[idx:idx+self.context_len]
-        x0 = self.targets[idx+self.context_len]
+        return len(self.samples)
 
-        return context, x0
+    def __getitem__(self, idx):
+        ticker = self.samples[idx][0]
+        context = self.samples[idx][1]
+        x0 = self.samples[idx][2]
+        return (ticker,context,x0)
 
