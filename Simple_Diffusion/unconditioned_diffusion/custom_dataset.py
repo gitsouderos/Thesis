@@ -13,9 +13,7 @@ class StockDiffusionDataset(Dataset):
     
     def __getitem__(self, idx):
         # For each sample, return the clean target.
-        # Optionally, you can add dimension reshaping if needed.
         x0 = self.targets[idx]
         x0 = torch.tensor([x0], dtype=torch.float32)
         # If x0 is a scalar and you want a tensor of shape [1],
-        # you might do: x0 = x0.unsqueeze(0) or x0 = torch.tensor([x0], dtype=torch.float32)
         return x0

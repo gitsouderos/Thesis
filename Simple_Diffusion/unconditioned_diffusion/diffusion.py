@@ -45,7 +45,7 @@ def cosine_beta_schedule(timesteps, s=0.008):
     Returns:
       - betas: A torch tensor of shape [T] with the beta values.
     """
-    # Create an array from 0 to T (inclusive)
+    # Create an array from 0 to T 
     x = np.linspace(0, timesteps, timesteps + 1)
     
     # Compute cumulative product (alpha_bar) using the cosine function
