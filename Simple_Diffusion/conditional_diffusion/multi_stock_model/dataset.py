@@ -49,9 +49,12 @@ def load_all_stock_data(data_folder):
 
 
 class ConditionalStockDataset(Dataset):
-    def __init__(self, data, context_len, feature_columns, target_column='Close'):
+    def __init__(self, data, context_len, feature_columns, target_column='Close',split='train'):
 
         self.samples = []
+        # Lets return train and test immidiately.
+        train =[]
+        test = []
 
         # Convert relevant columns to torch tensors
         for ticker in data:
@@ -62,9 +65,12 @@ class ConditionalStockDataset(Dataset):
             # Sort values on date, ascending
             df.sort_values(by=['Date'])
 
+            # All the samples of the specific ticker
+            ticker_samples = []
+
             for i in range(0,len(df)-context_len): # Eg: (0, 10-2) : i = 0,1,..,7
                 # For each dataframe extract the context window based on the feature columns
-                context = df[feature_columns][i:i+context_len-1] # Eg i = 2, we take from i = 2 until 2+2-1 = 3
+                context = df[i:i+context_len-1][feature_columns] # Eg i = 2, we take from i = 2 until 2+2-1 = 3
 
                 # Get x0
                 x0 = df[target_column].iloc[i+context_len] # We get item at position 2+2 = 4
@@ -73,14 +79,23 @@ class ConditionalStockDataset(Dataset):
                 context_tensor = torch.tensor(context.values,dtype=torch.float32)
                 x0_tensor = torch.tensor(x0.values, dtype=torch.float32)
                 grouped = (ticker,context_tensor,x0_tensor)
-                self.samples.append(grouped)
+                # self.samples.append(grouped)
+                ticker_samples.append(grouped)
+
+            train_size = int(len(ticker_samples)*0.8)
+            # print(ticker,train_size)
+            train.extend(ticker_samples[:train_size])
+            test.extend(ticker_samples[train_size:])
+            if split =="train":
+                self.samples = train
+            else:
+                self.samples = test
+        
 
     def __len__(self):
         return len(self.samples)
 
     def __getitem__(self, idx):
-        ticker = self.samples[idx][0]
-        context = self.samples[idx][1]
-        x0 = self.samples[idx][2]
+        ticker,context,x0 = self.samples[idx]
         return (ticker,context,x0)
 
