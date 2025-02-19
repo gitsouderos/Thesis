@@ -148,9 +148,6 @@ class model_architecture(nn.Module):
         predicted_noise = self.fc3(hidden2)
         return predicted_noise
     
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
 
 # Define the Att-DCNN module for context encoding.
 class Context_Encoder(nn.Module):
@@ -201,82 +198,6 @@ class Context_Encoder(nn.Module):
         context_embedding = self.relu(self.fc(context_embedding))
         return context_embedding
     
-# class PermutedLayerNorm(nn.Module):
-#     def __init__(self, normalized_shape):
-#         """
-#         normalized_shape: the expected size of the last dimension (e.g., hidden_dim)
-#         """
-#         super(PermutedLayerNorm, self).__init__()
-#         self.ln = nn.LayerNorm(normalized_shape)
-    
-#     def forward(self, x):
-#         # x is expected to be of shape [batch_size, hidden_dim, seq_len]
-#         x = x.transpose(1, 2)   # Now shape: [batch_size, seq_len, hidden_dim]
-#         x = self.ln(x)          # Normalize over last dimension (hidden_dim)
-#         return x.transpose(1, 2)  # Back to [batch_size, hidden_dim, seq_len]
-
-# class Context_Encoder(nn.Module):
-#     def __init__(self, input_dim, hidden_dim, kernel_sizes=[3, 5], dilation_rates=[1, 2, 4], num_heads=4):
-#         """
-#         A more sophisticated attention-based dilated CNN for encoding temporal patterns.
-        
-#         Args:
-#           - input_dim: Number of features in the context (e.g., 9).
-#           - hidden_dim: The output dimension for the convolution layers and the attention block.
-#           - kernel_sizes: List of kernel sizes for parallel convolutions.
-#           - dilation_rates: List of dilation rates.
-#           - num_heads: Number of attention heads for the self-attention block.
-#         """
-#         super(Context_Encoder, self).__init__()
-        
-#         # Create multiple parallel convolution blocks with different kernel sizes and dilation rates.
-#         self.conv_blocks = nn.ModuleList()
-#         for k in kernel_sizes:
-#             for d in dilation_rates:
-#                 padding = (k - 1) * d // 2
-#                 conv_block = nn.Sequential(
-#                     nn.Conv1d(in_channels=input_dim, out_channels=hidden_dim, kernel_size=k, dilation=d, padding=padding),
-#                     PermutedLayerNorm(hidden_dim),  # Apply LayerNorm over hidden_dim dimension
-#                     nn.ReLU()
-#                 )
-#                 self.conv_blocks.append(conv_block)
-        
-#         # Multi-head self-attention block.
-#         self.attention = nn.MultiheadAttention(embed_dim=hidden_dim, num_heads=num_heads, batch_first=True)
-        
-#         # A feed-forward layer to refine the aggregated context embedding.
-#         self.fc = nn.Linear(hidden_dim, hidden_dim)
-#         self.relu = nn.ReLU()
-
-#     def forward(self, x):
-#         """
-#         Args:
-#           - x: Input tensor of shape [batch_size, sequence_length, input_dim]
-#         Returns:
-#           - context_embedding: Tensor of shape [batch_size, hidden_dim]
-#         """
-#         batch_size, seq_len, _ = x.size()
-#         # Permute for convolution: [batch_size, input_dim, sequence_length]
-#         x_permuted = x.permute(0, 2, 1)
-#         conv_outs = []
-#         for conv in self.conv_blocks:
-#             conv_out = conv(x_permuted)  # shape: [batch_size, hidden_dim, sequence_length]
-#             conv_outs.append(conv_out)
-#         # Average the outputs from the different convolution blocks.
-#         x_conv = torch.stack(conv_outs, dim=0).mean(dim=0)  # shape: [batch_size, hidden_dim, sequence_length]
-#         # Permute back for self-attention: [batch_size, sequence_length, hidden_dim]
-#         x_conv = x_conv.permute(0, 2, 1)
-        
-#         # Apply multi-head self-attention; query, key, and value are all x_conv.
-#         attn_output, _ = self.attention(x_conv, x_conv, x_conv)  # shape: [batch_size, sequence_length, hidden_dim]
-        
-#         # Aggregate over the sequence dimension (e.g., mean pooling).
-#         context_embedding = attn_output.mean(dim=1)  # shape: [batch_size, hidden_dim]
-        
-#         # Refine the aggregated embedding with a fully connected layer and ReLU.
-#         context_embedding = self.relu(self.fc(context_embedding))
-#         return context_embedding
-
 class ResidualMLP(nn.Module):
     def __init__(self, dim, embedding_dim,context_embedding_size, hidden_size=256):
         super(ResidualMLP, self).__init__()
@@ -357,7 +278,6 @@ class ResidualMLP(nn.Module):
         # Flatten the attended output back to [batch_size, hidden_size]
         attn_flat = attn_output.reshape(batch_size, -1)
         
-        # Optionally, add a residual connection (here, we add the original hidden1 to the attended output).
         combined = attn_flat + hidden1  # shape: [batch_size, hidden_size]
         
         # Pass through the second FC layer and activation.
