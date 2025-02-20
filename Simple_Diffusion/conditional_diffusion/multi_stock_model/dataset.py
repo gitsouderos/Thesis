@@ -110,9 +110,10 @@ class ConditionalStockDataset(Dataset):
         return len(self.samples)
 
     def __getitem__(self, idx):
+        ticker,context,x0 = self.samples[idx]
         # Normalized context:
         context_norm = (context- self.context_min)/(self.context_max - self.context_min + 1e-8)
         x0_norm = (x0- self.target_min)/(self.target_max - self.target_min + 1e-8)
-        ticker,context,x0 = self.samples[idx]
+        
         return (ticker,context_norm,x0_norm)
 
