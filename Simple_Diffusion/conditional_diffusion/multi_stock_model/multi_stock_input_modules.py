@@ -72,6 +72,7 @@ def get_time_embedding(t,embedding_dim):
 # Create embedding based on the ticker (stock) of the batch sample
 class TickerEmbedding(nn.Module):
     def __init__(self,ticker_list, ticker_embedding_dim):
+        super(TickerEmbedding,self).__init__()
         
         '''
         Create a dictionary based on the index of the individual tickers. Then, we create an instance of nn.Embedding
@@ -84,11 +85,11 @@ class TickerEmbedding(nn.Module):
         Returns:
           -ticker embeddings 
         '''
-        self.embedding_dict = {ticker:index for index,ticker in ticker_list}
+        self.embedding_dict = {ticker:index for index,ticker in enumerate(ticker_list)}
         self.embedding = nn.Embedding(num_embeddings=len(ticker_list), embedding_dim = ticker_embedding_dim)
     
     def forward(self,tickers):
-        ticker_dict = self.embedding_dict(tickers) # Shape: [batch_size]
+        ticker_dict = torch.tensor([self.embedding_dict[t] for t in tickers], dtype=torch.long, device=self.embedding.weight.device) # Shape: [batch_size]
         ticker_emb = self.embedding(ticker_dict) # Shape : [batch_size,embedding_dim]
 
         return ticker_emb
