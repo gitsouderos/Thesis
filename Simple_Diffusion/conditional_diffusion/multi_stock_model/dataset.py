@@ -90,12 +90,29 @@ class ConditionalStockDataset(Dataset):
                 self.samples = train
             else:
                 self.samples = test
+
+        # Now that we have all the dta, its time for normalization (min max)
+        # To do that, we will compute the min and max on the training data for features and targets
+        # Then we will use that same info to apply normalization to test data too
+        
+        # Calculate training max and min
+        contexts = [sample[1] for sample in train]
+        contexts_cat = torch.cat(contexts,dim=0)
+        self.context_min,_ = torch.min(contexts_cat,dim=0)
+        self.context_max,_ = torch.max(contexts_cat,dim=0)
+        # For the targets
+        targets = torch.stack([sample[2] for sample in train],dim=0)
+        self.target_min = torch.min(targets)
+        self.target_max = torch.max(targets)
         
 
     def __len__(self):
         return len(self.samples)
 
     def __getitem__(self, idx):
+        # Normalized context:
+        context_norm = (context- self.context_min)/(self.context_max - self.context_min + 1e-8)
+        x0_norm = (x0- self.target_min)/(self.target_max - self.target_min + 1e-8)
         ticker,context,x0 = self.samples[idx]
-        return (ticker,context,x0)
+        return (ticker,context_norm,x0_norm)
 
