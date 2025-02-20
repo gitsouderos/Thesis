@@ -3,39 +3,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-def forward_diffusion_sample(x_0, timestep, betas):
-    """
-    Returns a noisy sample from the forward diffusion model.
 
-    Args: 
-    - x_0: Initial value of the sample (tensor of shape [batch_size, dim])
-    - timestep: Timestep at which to sample
-    - betas: Array of beta values for each timestep
 
-    Returns:
-    - x_t: Noisy sample at the given timestep
-    - noise: Noise added to the sample
-    """
-
-    # Unsqueeze x0
-    x_0 = x_0.unsqueeze(1) # Shape: [batch_size, 1]
-
-    # Compute alpha values from beta
-    alphas = 1 - betas # Shape: [T]
-
-    # Compute cumulative product of alphas
-    alpha_bars = torch.cumprod(alphas,dim=0) # Shape: [T]
-    
-    # Select appropriate alpha bar for the timestep
-    alpha_bar_t = alpha_bars[timestep].unsqueeze(1) # shape: [batch_size, 1]
-
-    # Generate Gaussian noise
-    noise = torch.randn_like(x_0)
-
-    # Compute noisy sample
-    x_t = x_0 * torch.sqrt(alpha_bar_t) + noise * torch.sqrt((1 - alpha_bar_t))
-
-    return x_t, noise
+##---------------------------- PRE DIFFUSION STEPS -----------------------------------##
 
 
 def cosine_beta_schedule(timesteps, s=0.008):
@@ -99,6 +69,36 @@ def get_time_embedding(t,embedding_dim):
     return time_embedding
 
 
+# Create embedding based on the ticker (stock) of the batch sample
+class TickerEmbedding(nn.Module):
+    def __init__(self,ticker_list, ticker_embedding_dim):
+        
+        '''
+        Create a dictionary based on the index of the individual tickers. Then, we create an instance of nn.Embedding
+        which creates a matrix of size [num_tickers, embedding_dim] where each row is a learnable vector (a ticker)
+
+        Args :
+          - ticker_list : list of all unique tickers
+          - ticker_embedding_dim: the dimension we want the embeddings to be, in this case 32
+
+        Returns:
+          -ticker embeddings 
+        '''
+        self.embedding_dict = {ticker:index for index,ticker in ticker_list}
+        self.embedding = nn.Embedding(num_embeddings=len(ticker_list), embedding_dim = ticker_embedding_dim)
+    
+    def forward(self,tickers):
+        ticker_dict = self.embedding_dict(tickers) # Shape: [batch_size]
+        ticker_emb = self.embedding(ticker_dict) # Shape : [batch_size,embedding_dim]
+
+        return ticker_emb
+        
+
+    
+
+    
+
+
 # Define the Att-DCNN module for context encoding.
 class Context_Encoder(nn.Module):
     def __init__(self, input_dim, hidden_dim, kernel_size=3, dilation_rates=[1, 2, 4], num_heads=4):
@@ -147,6 +147,47 @@ class Context_Encoder(nn.Module):
         # Refine with a fully connected layer and non-linearity
         context_embedding = self.relu(self.fc(context_embedding))
         return context_embedding
+    
+
+
+
+## ------------------------------------------DIFFUSION STEPS-----------------------------------------#
+
+
+
+def forward_diffusion_sample(x_0, timestep, betas):
+    """
+    Returns a noisy sample from the forward diffusion model.
+
+    Args: 
+    - x_0: Initial value of the sample (tensor of shape [batch_size, dim])
+    - timestep: Timestep at which to sample
+    - betas: Array of beta values for each timestep
+
+    Returns:
+    - x_t: Noisy sample at the given timestep
+    - noise: Noise added to the sample
+    """
+
+    # Unsqueeze x0
+    x_0 = x_0.unsqueeze(1) # Shape: [batch_size, 1]
+
+    # Compute alpha values from beta
+    alphas = 1 - betas # Shape: [T]
+
+    # Compute cumulative product of alphas
+    alpha_bars = torch.cumprod(alphas,dim=0) # Shape: [T]
+    
+    # Select appropriate alpha bar for the timestep
+    alpha_bar_t = alpha_bars[timestep].unsqueeze(1) # shape: [batch_size, 1]
+
+    # Generate Gaussian noise
+    noise = torch.randn_like(x_0)
+
+    # Compute noisy sample
+    x_t = x_0 * torch.sqrt(alpha_bar_t) + noise * torch.sqrt((1 - alpha_bar_t))
+
+    return x_t, noise
     
 class ResidualMLPWithExtraBlock(nn.Module):
     def __init__(self, dim, embedding_dim, context_embedding_size, hidden_size=512, num_chunks=8, attn_heads=4, dropout_prob=0.1):
