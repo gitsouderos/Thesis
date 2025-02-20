@@ -63,14 +63,14 @@ class ConditionalStockDataset(Dataset):
             df = data[ticker]
 
             # Sort values on date, ascending
-            df.sort_values(by=['Date'])
+            df.sort_values(by=['Date'],inplace=True)
 
             # All the samples of the specific ticker
             ticker_samples = []
 
             for i in range(0,len(df)-context_len): # Eg: (0, 10-2) : i = 0,1,..,7
                 # For each dataframe extract the context window based on the feature columns
-                context = df[i:i+context_len-1][feature_columns] # Eg i = 2, we take from i = 2 until 2+2-1 = 3
+                context = df[i:i+context_len][feature_columns] # Eg i = 2, we take from i = 2 until 2+2-1 = 3
 
                 # Get x0
                 x0 = df[target_column].iloc[i+context_len] # We get item at position 2+2 = 4
