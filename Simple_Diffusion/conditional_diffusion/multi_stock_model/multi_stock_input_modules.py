@@ -171,7 +171,7 @@ def forward_diffusion_sample(x_0, timestep, betas):
     """
 
     # Unsqueeze x0
-    x_0 = x_0.unsqueeze(1) # Shape: [batch_size, 1]
+    # x_0 = x_0.unsqueeze(1) # Shape: [batch_size, 1]
 
     # Compute alpha values from beta
     alphas = 1 - betas # Shape: [T]
