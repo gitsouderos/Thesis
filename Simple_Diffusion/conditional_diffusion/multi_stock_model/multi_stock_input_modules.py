@@ -191,7 +191,7 @@ def forward_diffusion_sample(x_0, timestep, betas):
     return x_t, noise
     
 class ResidualMLPWithExtraBlock(nn.Module):
-    def __init__(self, dim, embedding_dim, context_embedding_size, hidden_size=512, num_chunks=8, attn_heads=4, dropout_prob=0.1):
+    def __init__(self, dim, embedding_dim, context_embedding_size, ticker_embedding_size, hidden_size=512, num_chunks=8, attn_heads=4, dropout_prob=0.1):
         """
         A Residual MLP with attention that includes an extra residual attention block,
         layer normalization, and dropout. Modified to handle multi-stock input.
@@ -200,6 +200,7 @@ class ResidualMLPWithExtraBlock(nn.Module):
           - dim: Dimension of the noisy sample (e.g., 1 for a scalar target).
           - embedding_dim: Dimension of the time embedding.
           - context_embedding_size: Dimension of the context embedding.
+          - ticker_embedding_size: Dimension of the ticker embedding.
           - hidden_size: Hidden layer size for the MLP.
           - num_chunks: Number of chunks to split the hidden vector into for attention.
           - attn_heads: Number of attention heads.
@@ -208,7 +209,7 @@ class ResidualMLPWithExtraBlock(nn.Module):
         The total input dimension is: dim + embedding_dim + context_embedding_size.
         """
         super(ResidualMLPWithExtraBlock, self).__init__()
-        total_input_dim = dim + embedding_dim + context_embedding_size
+        total_input_dim = dim + embedding_dim + context_embedding_size + ticker_embedding_size
         self.fc1 = nn.Linear(total_input_dim, hidden_size)
         self.relu = nn.ReLU()
         self.dropout = nn.Dropout(dropout_prob)
@@ -240,19 +241,22 @@ class ResidualMLPWithExtraBlock(nn.Module):
         Returns:
           - predicted_noise: Tensor of shape [batch_size, num_stocks, dim]
         """
-        batch_size, num_stocks, _ = x_combined.shape
-        # Flatten batch and stocks: [batch_size*num_stocks, total_input_dim]
-        x_flat = x_combined.reshape(batch_size * num_stocks, -1)
+        # batch_size, num_stocks, _ = x_combined.shape
+        # # Flatten batch and stocks: [batch_size*num_stocks, total_input_dim]
+        # x_flat = x_combined.reshape(batch_size * num_stocks, -1)
+
         
-        hidden1 = self.relu(self.fc1(x_flat))  # shape: [batch_size*num_stocks, hidden_size]
+        hidden1 = self.relu(self.fc1(x_combined))  # shape: [batch_size*num_stocks, hidden_size]
         hidden1 = self.dropout(hidden1)
         hidden1 = self.layernorm1(hidden1)
+
+        batch_size = x_combined.shape[0]
         
         # Split into chunks: reshape to [batch_size*num_stocks, num_chunks, chunk_size]
-        hidden_chunks = hidden1.view(batch_size * num_stocks, self.num_chunks, self.chunk_size)
+        hidden_chunks = hidden1.view(batch_size, self.num_chunks, self.chunk_size)
         # First attention block over chunks
         attn_output1, _ = self.attention1(hidden_chunks, hidden_chunks, hidden_chunks)
-        attn_flat1 = attn_output1.reshape(batch_size * num_stocks, -1)  # [batch_size*num_stocks, hidden_size]
+        attn_flat1 = attn_output1.reshape(batch_size, -1)  # [batch_size*num_stocks, hidden_size]
         
         combined1 = attn_flat1 + hidden1  # residual connection
         combined1 = self.relu(self.fc2(combined1))
@@ -270,10 +274,8 @@ class ResidualMLPWithExtraBlock(nn.Module):
         combined2 = self.dropout(combined2)
         combined2 = self.layernorm3(combined2)
         
-        predicted_noise_flat = self.fc4(combined2)  # [batch_size*num_stocks, dim]
-        
-        # Reshape back to [batch_size, num_stocks, dim]
-        predicted_noise = predicted_noise_flat.reshape(batch_size, num_stocks, -1)
+        predicted_noise = self.fc4(combined2)  # [batch_size, dim]
+
         return predicted_noise
 
 
