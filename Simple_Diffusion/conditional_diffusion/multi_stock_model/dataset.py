@@ -62,7 +62,7 @@ class ConditionalStockDataset(Dataset):
             # Retrive dataframe
             df = data[ticker]
 
-            # Sort values on date, ascending
+            # Sort values on date, ascending, inplace
             df.sort_values(by=['Date'],inplace=True)
 
             # All the samples of the specific ticker
@@ -81,7 +81,28 @@ class ConditionalStockDataset(Dataset):
                 grouped = (ticker,context_tensor,x0_tensor)
                 # self.samples.append(grouped)
                 ticker_samples.append(grouped)
+            
+            # After this for loop, ticker_samples contains all the samples for the specific ticker
+            # We will now perform min max normalization on the context and x0
 
+            contexts = [sample[1] for sample in ticker_samples]
+            contexts_cat = torch.cat(contexts,dim=0)
+            context_min,_ = torch.min(contexts_cat,dim=0)
+            context_max,_ = torch.max(contexts_cat,dim=0)
+            # For the targets
+            targets = torch.stack([sample[2] for sample in ticker_samples],dim=0)
+            target_min = torch.min(targets)
+            target_max = torch.max(targets)
+
+            # Store the min and max values for the context and target in dictionary for the specific ticker
+            self.context_scalers = {}
+            self.target_scalers = {}
+            self.context_scalers[ticker] = (context_min,context_max)
+            self.target_scalers[ticker] = (target_min,target_max)
+
+            
+            # For each ticker, create train set with 80% of samples and test set with 20%. That way we have equal
+            # representation of different stocks
             train_size = int(len(ticker_samples)*0.8)
             # print(ticker,train_size)
             train.extend(ticker_samples[:train_size])
@@ -90,20 +111,6 @@ class ConditionalStockDataset(Dataset):
                 self.samples = train
             else:
                 self.samples = test
-
-        # Now that we have all the dta, its time for normalization (min max)
-        # To do that, we will compute the min and max on the training data for features and targets
-        # Then we will use that same info to apply normalization to test data too
-        
-        # Calculate training max and min
-        contexts = [sample[1] for sample in train]
-        contexts_cat = torch.cat(contexts,dim=0)
-        self.context_min,_ = torch.min(contexts_cat,dim=0)
-        self.context_max,_ = torch.max(contexts_cat,dim=0)
-        # For the targets
-        targets = torch.stack([sample[2] for sample in train],dim=0)
-        self.target_min = torch.min(targets)
-        self.target_max = torch.max(targets)
         
 
     def __len__(self):
@@ -111,9 +118,16 @@ class ConditionalStockDataset(Dataset):
 
     def __getitem__(self, idx):
         ticker,context,x0 = self.samples[idx]
+        # Retrieve the min and max values fo context and target using the ticker based dictionary
+        context_min = self.context_scalers[ticker][0]
+        context_max = self.context_scalers[ticker][1]
+        target_min = self.target_scalers[ticker][0]
+        target_max = self.target_scalers[ticker][1]
+
         # Normalized context:
-        context_norm = (context- self.context_min)/(self.context_max - self.context_min + 1e-8)
-        x0_norm = (x0- self.target_min)/(self.target_max - self.target_min + 1e-8)
+        context_norm = (context- context_min)/(context_max - context_min + 1e-8)
+        x0_norm = (x0- target_min)/(target_max - target_min + 1e-8)
+        print(f"Normal value : {x0}, Maximum Value = {target_max}, Minimum Value = {target_min}, Normalized Value = {x0_norm}")
         
         return (ticker,context_norm,x0_norm)
 
