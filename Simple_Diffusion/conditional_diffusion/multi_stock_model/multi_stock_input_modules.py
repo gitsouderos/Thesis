@@ -51,7 +51,7 @@ def get_time_embedding(t,embedding_dim):
     t = t.unsqueeze(1)
 
     # Create a vector for indices : j=0,1,2,...,embedding_dim/2 -1
-    j = torch.arange(0,embedding_dim//2,device=t.device).unsqueeze(0)
+    j = torch.arange(0,embedding_dim//2).unsqueeze(0)
 
     # Compute the scaling factor: scale = 10000^(2j/embedding_dim)
     scale = 10000**(2*j/embedding_dim)
