@@ -55,6 +55,8 @@ class ConditionalStockDataset(Dataset):
         # Lets return train and test immidiately.
         train =[]
         test = []
+        self.context_scalers = {}
+        self.target_scalers = {}
 
         # Convert relevant columns to torch tensors
         for ticker in data:
@@ -95,10 +97,11 @@ class ConditionalStockDataset(Dataset):
             target_max = torch.max(targets)
 
             # Store the min and max values for the context and target in dictionary for the specific ticker
-            self.context_scalers = {}
-            self.target_scalers = {}
+
+            # print(f"Ticker = {ticker}, Context Min = {context_min}, Context Max = {context_max}, Target Min = {target_min}, Target Max = {target_max}")
             self.context_scalers[ticker] = (context_min,context_max)
             self.target_scalers[ticker] = (target_min,target_max)
+            # print(self.context_scalers)
 
             
             # For each ticker, create train set with 80% of samples and test set with 20%. That way we have equal
@@ -119,6 +122,7 @@ class ConditionalStockDataset(Dataset):
     def __getitem__(self, idx):
         ticker,context,x0 = self.samples[idx]
         # Retrieve the min and max values fo context and target using the ticker based dictionary
+        # print(self.context_scalers)
         context_min = self.context_scalers[ticker][0]
         context_max = self.context_scalers[ticker][1]
         target_min = self.target_scalers[ticker][0]
@@ -127,7 +131,7 @@ class ConditionalStockDataset(Dataset):
         # Normalized context:
         context_norm = (context- context_min)/(context_max - context_min + 1e-8)
         x0_norm = (x0- target_min)/(target_max - target_min + 1e-8)
-        print(f"Normal value : {x0}, Maximum Value = {target_max}, Minimum Value = {target_min}, Normalized Value = {x0_norm}")
+        # print(f"Normal value : {x0}, Maximum Value = {target_max}, Minimum Value = {target_min}, Normalized Value = {x0_norm}")
         
         return (ticker,context_norm,x0_norm)
 
