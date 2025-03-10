@@ -67,7 +67,7 @@ class ConditionalStockDataset(Dataset):
                 # Extract the context window based on the feature columns
                 context = df[i:i+context_len][feature_columns]
                 # Get x0
-                x0 = df[target_column].iloc[i+context_len]
+                x0 = df[target_column].iloc[i+context_len-1]
                 # Convert to tensors
                 context_tensor = torch.tensor(context.values, dtype=torch.float32)
                 # If x0 is a scalar inside a Series, get its value

@@ -75,7 +75,7 @@ class ConditionalStockDataset(Dataset):
                 context = df[i:i+context_len][feature_columns] # Eg i = 2, we take from i = 2 until 2+2-1 = 3
 
                 # Get x0
-                x0 = df[target_column].iloc[i+context_len] # We get item at position 2+2 = 4
+                x0 = df[target_column].iloc[i+context_len-1] # We get item at position 2+2 = 4
             
                 # Save a tuple containing ticker, the context and the x0
                 context_tensor = torch.tensor(context.values,dtype=torch.float32)
