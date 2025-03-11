@@ -91,16 +91,20 @@ class ConditionalStockDataset(Dataset):
             contexts_cat = torch.cat(contexts,dim=0)
             context_min,_ = torch.min(contexts_cat,dim=0)
             context_max,_ = torch.max(contexts_cat,dim=0)
+            context_std = torch.std(contexts_cat,dim =0)
+            context_mean = torch.mean(contexts_cat,dim =0)
             # For the targets
             targets = torch.stack([sample[2] for sample in ticker_samples],dim=0)
             target_min = torch.min(targets)
             target_max = torch.max(targets)
+            target_std = torch.std(targets)
+            target_mean = torch.mean(targets)
 
             # Store the min and max values for the context and target in dictionary for the specific ticker
 
             # print(f"Ticker = {ticker}, Context Min = {context_min}, Context Max = {context_max}, Target Min = {target_min}, Target Max = {target_max}")
-            self.context_scalers[ticker] = (context_min,context_max)
-            self.target_scalers[ticker] = (target_min,target_max)
+            self.context_scalers[ticker] = (context_min,context_max,context_std,context_mean)
+            self.target_scalers[ticker] = (target_min,target_max,target_std,target_mean)
             # print(self.context_scalers)
 
             
@@ -125,12 +129,20 @@ class ConditionalStockDataset(Dataset):
         # print(self.context_scalers)
         context_min = self.context_scalers[ticker][0]
         context_max = self.context_scalers[ticker][1]
+        context_std = self.context_scalers[ticker][2]
+        context_mean = self.context_scalers[ticker][3]
         target_min = self.target_scalers[ticker][0]
         target_max = self.target_scalers[ticker][1]
+        target_std = self.target_scalers[ticker][2]
+        target_mean = self.target_scalers[ticker][3]
 
-        # Normalized context:
-        context_norm = (context- context_min)/(context_max - context_min + 1e-8)
-        x0_norm = (x0- target_min)/(target_max - target_min + 1e-8)
+        # # Normalized context:
+        # context_norm = (context- context_min)/(context_max - context_min + 1e-8)
+        # x0_norm = (x0- target_min)/(target_max - target_min + 1e-8)
+
+        # Lets apply standard normalization here
+        context_norm = (context - context_mean)/(context_std + 1e-8)
+        x0_norm = (x0 - target_mean)/(target_std + 1e-8)
         # print(f"Normal value : {x0}, Maximum Value = {target_max}, Minimum Value = {target_min}, Normalized Value = {x0_norm}")
         
         return (ticker,context_norm,x0_norm)

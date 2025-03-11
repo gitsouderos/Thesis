@@ -80,14 +80,19 @@ class ConditionalStockDataset(Dataset):
             contexts_cat = torch.cat(contexts, dim=0)
             context_min, _ = torch.min(contexts_cat, dim=0)
             context_max, _ = torch.max(contexts_cat, dim=0)
+            context_std = torch.std(contexts_cat, dim=0)
+            context_mean = torch.mean(contexts_cat, dim=0)
+
             # For the targets
             targets = torch.stack([sample[2] for sample in ticker_samples], dim=0)
             target_min = torch.min(targets)
             target_max = torch.max(targets)
+            target_std = torch.std(targets)
+            target_mean = torch.mean(targets)
 
             # Store scalers for the ticker
-            self.context_scalers[ticker] = (context_min, context_max)
-            self.target_scalers[ticker] = (target_min, target_max)
+            self.context_scalers[ticker] = (context_min, context_max, context_std, context_mean)
+            self.target_scalers[ticker] = (target_min, target_max, target_std, target_mean)
             
             # Split into train (80%) and test (20%)
             train_size = int(len(ticker_samples) * 0.8)
@@ -107,12 +112,19 @@ class ConditionalStockDataset(Dataset):
         # Retrieve scalers for normalization
         context_min = self.context_scalers[ticker][0]
         context_max = self.context_scalers[ticker][1]
+        context_std = self.context_scalers[ticker][2]
+        context_mean = self.context_scalers[ticker][3]
         target_min = self.target_scalers[ticker][0]
         target_max = self.target_scalers[ticker][1]
+        target_std = self.target_scalers[ticker][2]
+        target_mean = self.target_scalers[ticker][3]
 
-        # Normalized context and target
-        context_norm = (context - context_min) / (context_max - context_min + 1e-8)
-        x0_norm = (x0 - target_min) / (target_max - target_min + 1e-8)
+        # # Normalized context and target
+        # context_norm = (context - context_min) / (context_max - context_min + 1e-8)
+        # x0_norm = (x0 - target_min) / (target_max - target_min + 1e-8)
         
+        #Lets try standardization
+        context_norm = (context - context_mean) / (context_std + 1e-8)
+        x0_norm = (x0 - target_mean) / (target_std + 1e-8)
         # Move tensors to the proper device
         return (ticker, context_norm.to(self.device), x0_norm.to(self.device))
