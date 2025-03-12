@@ -45,7 +45,7 @@ def load_all_stock_data(data_folder):
     return stock_data
 
 class ConditionalStockDataset(Dataset):
-    def __init__(self, data, context_len, feature_columns, target_column='Close', split='train', device='cpu'):
+    def __init__(self, data, context_len, feature_columns, target_column='Close', split='train', device='cpu', normalization= 'min_max'):
         self.device = device
         self.samples = []
         # Lets return train and test immediately.
@@ -53,6 +53,7 @@ class ConditionalStockDataset(Dataset):
         test = []
         self.context_scalers = {}
         self.target_scalers = {}
+        self.normalization = normalization
 
         # Convert relevant columns to torch tensors
         for ticker in data:
@@ -119,12 +120,11 @@ class ConditionalStockDataset(Dataset):
         target_std = self.target_scalers[ticker][2]
         target_mean = self.target_scalers[ticker][3]
 
-        # # Normalized context and target
-        # context_norm = (context - context_min) / (context_max - context_min + 1e-8)
-        # x0_norm = (x0 - target_min) / (target_max - target_min + 1e-8)
-        
-        #Lets try standardization
-        context_norm = (context - context_mean) / (context_std + 1e-8)
-        x0_norm = (x0 - target_mean) / (target_std + 1e-8)
+        if self.normalization == 'min_max':
+            context_norm = (context - context_min) / (context_max - context_min + 1e-8)
+            x0_norm = (x0 - target_min) / (target_max - target_min + 1e-8)
+        elif self.normalization == 'standard':
+            context_norm = (context - context_mean) / (context_std + 1e-8)
+            x0_norm = (x0 - target_mean) / (target_std + 1e-8)
         # Move tensors to the proper device
         return (ticker, context_norm.to(self.device), x0_norm.to(self.device))
