@@ -5,14 +5,31 @@ import torch
 from torch.utils.data import Dataset
 
 def compute_financial_indicators(df):
+   
     df = df.copy()
     # Make sure the data is sorted by Date
     df['Date'] = pd.to_datetime(df['Date'])
     df.sort_values('Date', inplace=True)
     
-    # Daily Return (percentage change)
-    df['Return'] = (df['Close'] - df['Open']) / df['Open']
-    
+    # Intraday Return (percentage change)
+    df['Return'] = ((df['Close'] - df['Open']) / df['Open']) * 100
+
+    # Overnight return (percentage change)
+    df['Overnight_Return'] = ((df['Open'] - df['Close'].shift(1)) / df['Close'].shift(1)) * 100
+
+    # True range max(High - Low, |High - Close_prev|, |Low - Close_prev|) / Close_prev * 100%
+    df['TR1'] = (df['High'] - df['Low']) / df['Close'].shift(1) * 100
+    df['TR2'] = (np.abs(df['High'] - df['Close'].shift(1))) / df['Close'].shift(1) * 100
+    df['TR3'] = (np.abs(df['Low'] - df['Close'].shift(1))) / df['Close'].shift(1) * 100
+    df['TR'] = np.max(df[['TR1', 'TR2', 'TR3']], axis=1)
+
+    # Rolling volatility (standard deviation of returns)
+    df['Vol_5d'] = df['Return'].rolling(5).std()
+    df['Vol_10d'] = df['Return'].rolling(10).std()
+
+    # Z-score of daily returns (shows how unusual today's return is)
+    df['Return_Z'] = (df['Return'] - df['Return'].rolling(20).mean()) / df['Return'].rolling(20).std()
+
     # Price Difference
     df['Diff'] = df['Close'] - df['Open']
     

@@ -24,11 +24,11 @@ def compute_financial_indicators(df):
     df['TR'] = np.max(df[['TR1', 'TR2', 'TR3']], axis=1)
 
     # Rolling volatility (standard deviation of returns)
-    df['Vol_5d'] = df['Daily_Return'].rolling(5).std()
-    df['Vol_10d'] = df['Daily_Return'].rolling(10).std()
+    df['Vol_5d'] = df['Return'].rolling(5).std()
+    df['Vol_10d'] = df['Return'].rolling(10).std()
 
     # Z-score of daily returns (shows how unusual today's return is)
-    df['Return_Z'] = (df['Daily_Return'] - df['Daily_Return'].rolling(20).mean()) / df['Daily_Return'].rolling(20).std()
+    df['Return_Z'] = (df['Return'] - df['Return'].rolling(20).mean()) / df['Return'].rolling(20).std()
 
     # Price Difference
     df['Diff'] = df['Close'] - df['Open']
@@ -41,8 +41,6 @@ def compute_financial_indicators(df):
     
     # 5-day Moving Average of the Return (shifted)
     df['Return_MA5'] = df['Return'].rolling(window=5).mean().shift(1)
-
-
     
     # Drop rows with NaN values from the rolling calculations
     df = df.dropna().reset_index(drop=True)
@@ -63,76 +61,62 @@ def load_all_stock_data(data_folder):
     print(f"Loaded and processed data for {len(stock_data)} stocks")
     return stock_data
 
-
-
-
 class ConditionalStockDataset(Dataset):
-    def __init__(self, data, context_len, feature_columns, target_column='Close',split='train'):
-
+    def __init__(self, data, context_len, feature_columns, target_column='Close', split='train', device='cpu', normalization= 'min_max'):
+        self.device = device
         self.samples = []
-        # Lets return train and test immidiately.
+        # Lets return train and test immediately.
         train =[]
         test = []
         self.context_scalers = {}
         self.target_scalers = {}
+        self.normalization = normalization
 
         # Convert relevant columns to torch tensors
         for ticker in data:
-
-            # Retrive dataframe
+            # Retrieve dataframe
             df = data[ticker]
-
             # Sort values on date, ascending, inplace
-            df.sort_values(by=['Date'],inplace=True)
-
+            df.sort_values(by=['Date'], inplace=True)
             # All the samples of the specific ticker
             ticker_samples = []
 
-            for i in range(0,len(df)-context_len): # Eg: (0, 10-2) : i = 0,1,..,7
-                # For each dataframe extract the context window based on the feature columns
-                context = df[i:i+context_len][feature_columns] # Eg i = 2, we take from i = 2 until 2+2-1 = 3
-
+            for i in range(0, len(df) - context_len):  # Eg: (0, 10-2) : i = 0,1,..,7
+                # Extract the context window based on the feature columns
+                context = df[i:i+context_len][feature_columns]
                 # Get x0
-                x0 = df[target_column].iloc[i+context_len-1] # We get item at position 2+2 = 4
-            
-                # Save a tuple containing ticker, the context and the x0
-                context_tensor = torch.tensor(context.values,dtype=torch.float32)
-                x0_tensor = torch.tensor(x0.values, dtype=torch.float32)
-                grouped = (ticker,context_tensor,x0_tensor)
-                # self.samples.append(grouped)
+                x0 = df[target_column].iloc[i+context_len-1]
+                # Convert to tensors
+                context_tensor = torch.tensor(context.values, dtype=torch.float32)
+                # If x0 is a scalar inside a Series, get its value
+                x0_tensor = torch.tensor(x0 if np.isscalar(x0) else x0.values, dtype=torch.float32)
+                grouped = (ticker, context_tensor, x0_tensor)
                 ticker_samples.append(grouped)
             
-            # After this for loop, ticker_samples contains all the samples for the specific ticker
-            # We will now perform min max normalization on the context and x0
-
+            # Perform min-max normalization on the context and x0
             contexts = [sample[1] for sample in ticker_samples]
-            contexts_cat = torch.cat(contexts,dim=0)
-            context_min,_ = torch.min(contexts_cat,dim=0)
-            context_max,_ = torch.max(contexts_cat,dim=0)
-            context_std = torch.std(contexts_cat,dim =0)
-            context_mean = torch.mean(contexts_cat,dim =0)
+            contexts_cat = torch.cat(contexts, dim=0)
+            context_min, _ = torch.min(contexts_cat, dim=0)
+            context_max, _ = torch.max(contexts_cat, dim=0)
+            context_std = torch.std(contexts_cat, dim=0)
+            context_mean = torch.mean(contexts_cat, dim=0)
+
             # For the targets
-            targets = torch.stack([sample[2] for sample in ticker_samples],dim=0)
+            targets = torch.stack([sample[2] for sample in ticker_samples], dim=0)
             target_min = torch.min(targets)
             target_max = torch.max(targets)
             target_std = torch.std(targets)
             target_mean = torch.mean(targets)
 
-            # Store the min and max values for the context and target in dictionary for the specific ticker
-
-            # print(f"Ticker = {ticker}, Context Min = {context_min}, Context Max = {context_max}, Target Min = {target_min}, Target Max = {target_max}")
-            self.context_scalers[ticker] = (context_min,context_max,context_std,context_mean)
-            self.target_scalers[ticker] = (target_min,target_max,target_std,target_mean)
-            # print(self.context_scalers)
-
+            # Store scalers for the ticker
+            self.context_scalers[ticker] = (context_min, context_max, context_std, context_mean)
+            self.target_scalers[ticker] = (target_min, target_max, target_std, target_mean)
             
-            # For each ticker, create train set with 80% of samples and test set with 20%. That way we have equal
-            # representation of different stocks
-            train_size = int(len(ticker_samples)*0.8)
-            # print(ticker,train_size)
+            # Split into train (80%) and test (20%)
+            train_size = int(len(ticker_samples) * 0.8)
             train.extend(ticker_samples[:train_size])
             test.extend(ticker_samples[train_size:])
-            if split =="train":
+            if split == "train":
                 self.samples = train
             else:
                 self.samples = test
@@ -142,9 +126,8 @@ class ConditionalStockDataset(Dataset):
         return len(self.samples)
 
     def __getitem__(self, idx):
-        ticker,context,x0 = self.samples[idx]
-        # Retrieve the min and max values fo context and target using the ticker based dictionary
-        # print(self.context_scalers)
+        ticker, context, x0 = self.samples[idx]
+        # Retrieve scalers for normalization
         context_min = self.context_scalers[ticker][0]
         context_max = self.context_scalers[ticker][1]
         context_std = self.context_scalers[ticker][2]
@@ -154,14 +137,11 @@ class ConditionalStockDataset(Dataset):
         target_std = self.target_scalers[ticker][2]
         target_mean = self.target_scalers[ticker][3]
 
-        # # Normalized context:
-        # context_norm = (context- context_min)/(context_max - context_min + 1e-8)
-        # x0_norm = (x0- target_min)/(target_max - target_min + 1e-8)
-
-        # Lets apply standard normalization here
-        context_norm = (context - context_mean)/(context_std + 1e-8)
-        x0_norm = (x0 - target_mean)/(target_std + 1e-8)
-        # print(f"Normal value : {x0}, Maximum Value = {target_max}, Minimum Value = {target_min}, Normalized Value = {x0_norm}")
-        
-        return (ticker,context_norm,x0_norm)
-
+        if self.normalization == 'min_max':
+            context_norm = (context - context_min) / (context_max - context_min + 1e-8)
+            x0_norm = (x0 - target_min) / (target_max - target_min + 1e-8)
+        elif self.normalization == 'standard':
+            context_norm = (context - context_mean) / (context_std + 1e-8)
+            x0_norm = (x0 - target_mean) / (target_std + 1e-8)
+        # Move tensors to the proper device
+        return (ticker, context_norm.to(self.device), x0_norm.to(self.device))
