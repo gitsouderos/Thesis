@@ -51,7 +51,7 @@ def get_time_embedding(t,embedding_dim):
     t = t.unsqueeze(1)
 
     # Create a vector for indices : j=0,1,2,...,embedding_dim/2 -1
-    j = torch.arange(0,embedding_dim//2).unsqueeze(0)
+    j = torch.arange(0,embedding_dim//2,device=t.device).unsqueeze(0)
 
     # Compute the scaling factor: scale = 10000^(2j/embedding_dim)
     scale = 10000**(2*j/embedding_dim)
@@ -362,12 +362,12 @@ def run_reverse_diffusion(denoise_net, context_net, context, betas, num_steps, b
       - x_0_pred: The generated sample(s) after running reverse diffusion.
     """
     # Initialize x_T as pure Gaussian noise
-    x_t = torch.randn(batch_size, dim)
+    x_t = torch.randn(batch_size, dim,device=betas.device)
     # Loop from t = num_steps - 1 down to 0
     for t_val in reversed(range(num_steps)):
         print(f"timestep: {t_val}")
         # Create a timestep tensor for the current step, shape: [batch_size]
-        t_tensor = torch.full((batch_size,), t_val, dtype=torch.long)
+        t_tensor = torch.full((batch_size,), t_val, dtype=torch.long,device=betas.device)
         # Update x_t by performing one reverse diffusion step
         x_t = reverse_diffusion_sample(x_t, betas, t_tensor,embedding_dim, context, context_net, denoise_net,context_net,context)
     return x_t
