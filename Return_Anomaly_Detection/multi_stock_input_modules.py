@@ -369,6 +369,6 @@ def run_reverse_diffusion(denoise_net, context_net, context, betas, num_steps, b
         # Create a timestep tensor for the current step, shape: [batch_size]
         t_tensor = torch.full((batch_size,), t_val, dtype=torch.long,device=betas.device)
         # Update x_t by performing one reverse diffusion step
-        x_t = reverse_diffusion_sample(x_t, betas, t_tensor,embedding_dim, context, context_net, denoise_net,context_net,context)
+        x_t = reverse_diffusion_sample(x_t, betas, t_tensor,embedding_dim, context, context_net, denoise_net)
     return x_t
 
