@@ -123,6 +123,12 @@ class Context_Encoder(nn.Module):
         # Fully connected layer to refine the aggregated context embedding
         self.fc = nn.Linear(hidden_dim, hidden_dim)
         self.relu = nn.ReLU()
+        # Enhancment to better capture temporal patters
+        self.pattern_detector = nn.Sequential(
+            nn.Linear(hidden_dim,hidden_dim//2),
+            nn.ReLU(),
+            nn.Linear(hidden_dim//2,hidden_dim),
+        )
 
     def forward(self, x):
         """
@@ -147,6 +153,9 @@ class Context_Encoder(nn.Module):
         context_embedding = attn_output.mean(dim=1)  # shape: [batch_size, hidden_dim]
         # Refine with a fully connected layer and non-linearity
         context_embedding = self.relu(self.fc(context_embedding))
+        # Enhance the context embedding with a pattern detector
+        pattern_features = self.pattern_detector(context_embedding)
+        context_embedding = context_embedding + pattern_features
         return context_embedding
     
 
