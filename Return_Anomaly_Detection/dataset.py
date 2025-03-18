@@ -94,7 +94,13 @@ class ConditionalStockDataset(Dataset):
                 ticker_samples.append(grouped)
             
             # Perform min-max normalization on the context and x0
-            contexts = [sample[1] for sample in ticker_samples]
+            # Values should be taken from the training set only
+            # Split into train (80%) and test (20%)
+            train_size = int(len(ticker_samples) * 0.8)
+            train.extend(ticker_samples[:train_size])
+            test.extend(ticker_samples[train_size:])
+
+            contexts = [sample[1] for sample in train]
             contexts_cat = torch.cat(contexts, dim=0)
             context_min, _ = torch.min(contexts_cat, dim=0)
             context_max, _ = torch.max(contexts_cat, dim=0)
@@ -102,7 +108,7 @@ class ConditionalStockDataset(Dataset):
             context_mean = torch.mean(contexts_cat, dim=0)
 
             # For the targets
-            targets = torch.stack([sample[2] for sample in ticker_samples], dim=0)
+            targets = torch.stack([sample[2] for sample in train], dim=0)
             target_min = torch.min(targets)
             target_max = torch.max(targets)
             target_std = torch.std(targets)
@@ -112,10 +118,7 @@ class ConditionalStockDataset(Dataset):
             self.context_scalers[ticker] = (context_min, context_max, context_std, context_mean)
             self.target_scalers[ticker] = (target_min, target_max, target_std, target_mean)
             
-            # Split into train (80%) and test (20%)
-            train_size = int(len(ticker_samples) * 0.8)
-            train.extend(ticker_samples[:train_size])
-            test.extend(ticker_samples[train_size:])
+
             if split == "train":
                 self.samples = train
             else:
