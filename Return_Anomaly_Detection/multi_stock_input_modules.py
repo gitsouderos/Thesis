@@ -288,7 +288,7 @@ class ResidualMLPWithExtraBlock(nn.Module):
         return predicted_noise
 
 
-def reverse_diffusion_sample(x_T, betas, timestep, embedding_dim, context, context_net, denoise_net):
+def reverse_diffusion_sample(x_T, betas, timestep, embedding_dim, context, context_net,ticker,ticker_emb_layer,  denoise_net):
     
     """
     Performs one reverse diffusion step.
@@ -325,6 +325,8 @@ def reverse_diffusion_sample(x_T, betas, timestep, embedding_dim, context, conte
     # Concatentate x and context_embedding
     x_combined = torch.cat([x, context_embedding], dim=-1) # Shape: [batch_size, dim + embedding_dim + context_embedding_size]
 
+    ticker_embedding = ticker_emb_layer(ticker)
+    x_combined = torch.cat([x_combined, ticker_embedding], dim=-1) # Shape: [batch_size, dim + embedding_dim + context_embedding_size + ticker_embedding_size]
     # pass x through the model architecture
     predicted_noise = denoise_net(x_combined) # Shape: [batch_size, dim]
     # print(f"noisy sample : {x_T}")
@@ -346,12 +348,20 @@ def reverse_diffusion_sample(x_T, betas, timestep, embedding_dim, context, conte
     # Compute the necessary square roots
     sqrt_alpha_t = torch.sqrt(alpha_t)                   # Shape: [batch_size, 1]
     # print(f"square root of alpha_t : {sqrt_alpha_t}")
-    sqrt_one_minus_alpha_bar_t = torch.sqrt(1 - alpha_bar_t)  # Shape: [batch_size, 1]
+    # To avoide numerical instablity i will add a small epsilon
+    sqrt_one_minus_alpha_bar_t = torch.sqrt(1 - alpha_bar_t) +1e-8  # Shape: [batch_size, 1]
     # print(f"square root of 1 - alpha_bar_t : {sqrt_one_minus_alpha_bar_t}")
+    coefficient = torch.min(beta_t / sqrt_one_minus_alpha_bar_t, torch.ones_like(beta_t) * 10.0)
 
     # Apply the reverse diffusion update:
     # x_{t-1} = ( x_T - (beta_t / sqrt(1 - alpha_bar_t)) * predicted_noise ) / sqrt(alpha_t)
-    x_t_minus_1 = (x_T - (beta_t / sqrt_one_minus_alpha_bar_t) * predicted_noise) / sqrt_alpha_t
+    # x_t_minus_1 = (x_T - (beta_t / sqrt_one_minus_alpha_bar_t) * predicted_noise) / sqrt_alpha_t
+    x_t_minus_1 = (x_T - coefficient * predicted_noise) / sqrt_alpha_t
+    # Lets try to add variance component for t>0 so not for the final step
+    if timestep[0]>0:
+        sigma_t = torch.sqrt(beta_t)
+        noise = torch.randn_like(x_T)
+        x_t_minus_1 = x_t_minus_1 + sigma_t * noise
     # print(f"less noisy sample : {x_t_minus_1}")
 
     return x_t_minus_1
